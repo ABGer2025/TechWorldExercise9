@@ -1,39 +1,101 @@
-@Library('jenkins-shared-library') _
+pipeline {
+  agent any
 
-def targetBranch = 'main'
-def currentBranch = (env.BRANCH_NAME ?: env.GIT_BRANCH ?: '').replaceFirst(/^origin\//, '')
-
-if (currentBranch == targetBranch) {
-  nodePipeline(
-    appDir: 'app',
-    dockerRepo: 'abger2025/bootcamp-node-project',
-    gitBranch: 'main',
-    dockerCredsId: 'dockerhub-creds',
-    gitCredsId: 'git-https-creds',
-    gitRemoteUrl: 'https://github.com/ABGer2025/TechWorldExercise9.git'
-  )
-
-  node {
-    stage('Deploy to EC2') {
-      sshagent(['ec2-ssh']) {
-        sh """
-          ssh -o StrictHostKeyChecking=no ec2-user@13.62.58.201 \
-            "cd /home/ec2-user/app/TechWorldExercise9/app && docker compose pull && docker compose up -d"
-        """
-      }
-    }
+  environment {
+    APP_DIR = 'app'
+    DOCKER_REPO = 'abger2025/bootcamp-node-project'
+    GIT_REMOTE_URL = 'https://github.com/ABGer2025/TechWorldExercise9.git'
   }
-} else {
-  node {
+
+  stages {
     stage('Install Dependencies') {
-      dir('app') {
-        sh 'npm ci'
+      steps {
+        dir(env.APP_DIR) {
+          sh 'npm ci'
+        }
       }
     }
 
     stage('Run Tests') {
-      dir('app') {
-        sh 'npm test'
+      steps {
+        dir(env.APP_DIR) {
+          sh 'npm test'
+        }
+      }
+    }
+
+    stage('Increment Version') {
+      when {
+        expression {
+          def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+          return branchName == 'main' || branchName == 'origin/main'
+        }
+      }
+      steps {
+        dir(env.APP_DIR) {
+          sh 'npm version minor --no-git-tag-version'
+          script {
+            env.APP_VERSION = sh(
+              script: "node -p \"require('./package.json').version\"",
+              returnStdout: true
+            ).trim()
+          }
+        }
+      }
+    }
+
+    stage('Build Docker Image') {
+      when {
+        expression {
+          def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+          return branchName == 'main' || branchName == 'origin/main'
+        }
+      }
+      steps {
+        dir(env.APP_DIR) {
+          sh "docker build -t ${env.DOCKER_REPO}:${env.APP_VERSION} ."
+        }
+      }
+    }
+
+    stage('Push Docker Image') {
+      when {
+        expression {
+          def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+          return branchName == 'main' || branchName == 'origin/main'
+        }
+      }
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'dockerhub-creds',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+          )
+        ]) {
+          sh """
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+            docker push ${env.DOCKER_REPO}:${env.APP_VERSION}
+            docker logout
+          """
+        }
+      }
+    }
+
+    stage('Deploy to EC2') {
+      when {
+        expression {
+          def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+          return branchName == 'main' || branchName == 'origin/main'
+        }
+      }
+      steps {
+        sshagent(['ec2-ssh']) {
+          sh """
+            ssh -o StrictHostKeyChecking=no ec2-user@13.62.58.201 \
+              "cd /home/ec2-user/app/TechWorldExercise9/app && docker compose pull && docker compose up -d"
+          """
+        }
       }
     }
   }
