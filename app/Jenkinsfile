@@ -1,0 +1,10 @@
+@Library('jenkins-shared-library') _
+
+nodePipeline(
+  appDir: 'app',
+  dockerRepo: 'abger2025/bootcamp-node-project',
+  gitBranch: 'main',
+  dockerCredsId: 'dockerhub-creds',
+  gitCredsId: 'git-https-creds',
+  gitRemoteUrl: 'https://github.com/ABGer2025/TechWorldExercise9.git'
+)
