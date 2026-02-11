@@ -9,11 +9,13 @@ nodePipeline(
   gitRemoteUrl: 'https://github.com/ABGer2025/TechWorldExercise9.git'
 )
 
-stage('Deploy to EC2') {
-  sshagent(['git-https-creds']) {
-    sh """
-      ssh -o StrictHostKeyChecking=no ec2-user@13.62.58.201 \
-        'cd /home/ec2-user/app && docker compose pull && docker compose up -d'
-    """
+node {
+  stage('Deploy to EC2') {
+    sshagent(['git-https-creds']) {
+      sh """
+        ssh -o StrictHostKeyChecking=no ec2-user@13.62.58.201 \
+          'cd /home/ec2-user/app && docker compose pull && docker compose up -d'
+      """
+    }
   }
 }
