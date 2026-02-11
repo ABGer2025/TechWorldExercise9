@@ -1,21 +1,100 @@
-@Library('jenkins-shared-library') _
+pipeline {
+  agent any
 
-nodePipeline(
-  appDir: 'app',
-  dockerRepo: 'abger2025/bootcamp-node-project',
-  gitBranch: 'main',
-  dockerCredsId: 'dockerhub-creds',
-  gitCredsId: 'git-https-creds',
-  gitRemoteUrl: 'https://github.com/ABGer2025/TechWorldExercise9.git'
-)
+  environment {
+    APP_DIR = 'app'
+    DOCKER_REPO = 'abger2025/bootcamp-node-project'
+    GIT_REMOTE_URL = 'https://github.com/ABGer2025/TechWorldExercise9.git'
+  }
 
-node {
-  stage('Deploy to EC2') {
-    sshagent(['ec2-ssh']) {
-      sh """
-        ssh -o StrictHostKeyChecking=no ec2-user@13.62.58.201 \
-          "cd /home/ec2-user/app/TechWorldExercise9/app && docker compose pull && docker compose up -d"
-      """
+  stages {
+    stage('Install Dependencies') {
+      steps {
+        dir(env.APP_DIR) {
+          sh 'npm ci'
+        }
+      }
+    }
+
+    stage('Run Tests') {
+      steps {
+        dir(env.APP_DIR) {
+          sh 'npm test'
+        }
+      }
+    }
+
+    stage('Increment Version') {
+      steps {
+        dir(env.APP_DIR) {
+          sh 'npm version minor --no-git-tag-version'
+          script {
+            env.APP_VERSION = sh(
+              script: "node -p \"require('./package.json').version\"",
+              returnStdout: true
+            ).trim()
+          }
+        }
+      }
+    }
+
+    stage('Build Docker Image') {
+      steps {
+        dir(env.APP_DIR) {
+          sh "docker build -t ${env.DOCKER_REPO}:${env.APP_VERSION} ."
+        }
+      }
+    }
+
+    stage('Push Docker Image') {
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'dockerhub-creds',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+          )
+        ]) {
+          sh """
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+            docker push ${env.DOCKER_REPO}:${env.APP_VERSION}
+            docker logout
+          """
+        }
+      }
+    }
+
+    stage('Commit & Push Version') {
+      steps {
+        dir(env.APP_DIR) {
+          sh 'git checkout -B main'
+          sh 'git add package.json package-lock.json'
+          sh "git -c user.name=jenkins -c user.email=jenkins@local commit -m \"chore: bump version to ${env.APP_VERSION}\""
+        }
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'git-https-creds',
+            usernameVariable: 'GIT_USER',
+            passwordVariable: 'GIT_PASS'
+          )
+        ]) {
+          sh """
+            git remote set-url origin https://$GIT_USER:$GIT_PASS@github.com/ABGer2025/TechWorldExercise9.git
+            git push origin main
+          """
+        }
+      }
+    }
+
+    stage('Deploy to EC2') {
+      steps {
+        sshagent(['ec2-ssh']) {
+          sh """
+            ssh -o StrictHostKeyChecking=no ec2-user@13.62.58.201 \
+              "cd /home/ec2-user/app/TechWorldExercise9/app && docker compose pull && docker compose up -d"
+          """
+        }
+      }
     }
   }
 }
