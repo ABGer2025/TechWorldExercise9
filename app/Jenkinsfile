@@ -1,21 +1,40 @@
 @Library('jenkins-shared-library') _
 
-nodePipeline(
-  appDir: 'app',
-  dockerRepo: 'abger2025/bootcamp-node-project',
-  gitBranch: 'main',
-  dockerCredsId: 'dockerhub-creds',
-  gitCredsId: 'git-https-creds',
-  gitRemoteUrl: 'https://github.com/ABGer2025/TechWorldExercise9.git'
-)
+def targetBranch = 'main'
+def currentBranch = (env.BRANCH_NAME ?: env.GIT_BRANCH ?: '').replaceFirst(/^origin\//, '')
 
-node {
-  stage('Deploy to EC2') {
-    sshagent(['ec2-ssh']) {
-      sh """
-        ssh -o StrictHostKeyChecking=no ec2-user@13.62.58.201 \
-          "cd /home/ec2-user/app/TechWorldExercise9/app && docker compose pull && docker compose up -d"
-      """
+if (currentBranch == targetBranch) {
+  nodePipeline(
+    appDir: 'app',
+    dockerRepo: 'abger2025/bootcamp-node-project',
+    gitBranch: 'main',
+    dockerCredsId: 'dockerhub-creds',
+    gitCredsId: 'git-https-creds',
+    gitRemoteUrl: 'https://github.com/ABGer2025/TechWorldExercise9.git'
+  )
+
+  node {
+    stage('Deploy to EC2') {
+      sshagent(['ec2-ssh']) {
+        sh """
+          ssh -o StrictHostKeyChecking=no ec2-user@13.62.58.201 \
+            "cd /home/ec2-user/app/TechWorldExercise9/app && docker compose pull && docker compose up -d"
+        """
+      }
+    }
+  }
+} else {
+  node {
+    stage('Install Dependencies') {
+      dir('app') {
+        sh 'npm ci'
+      }
+    }
+
+    stage('Run Tests') {
+      dir('app') {
+        sh 'npm test'
+      }
     }
   }
 }
