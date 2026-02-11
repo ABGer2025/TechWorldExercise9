@@ -14,7 +14,7 @@ node {
     sshagent(['ec2-ssh']) {
       sh """
         ssh -o StrictHostKeyChecking=no ec2-user@13.62.58.201 \
-          'cd /home/ec2-user/app && docker compose pull && docker compose up -d'
+          "cd /home/ec2-user/app/aws-exercises/app && docker compose pull && docker compose up -d"
       """
     }
   }
