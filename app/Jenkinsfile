@@ -26,7 +26,10 @@ pipeline {
 
     stage('Increment Version') {
       when {
-        branch 'main'
+        expression {
+          def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+          return branchName == 'main' || branchName == 'origin/main'
+        }
       }
       steps {
         dir(env.APP_DIR) {
@@ -43,7 +46,10 @@ pipeline {
 
     stage('Build Docker Image') {
       when {
-        branch 'main'
+        expression {
+          def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+          return branchName == 'main' || branchName == 'origin/main'
+        }
       }
       steps {
         dir(env.APP_DIR) {
@@ -54,7 +60,10 @@ pipeline {
 
     stage('Push Docker Image') {
       when {
-        branch 'main'
+        expression {
+          def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+          return branchName == 'main' || branchName == 'origin/main'
+        }
       }
       steps {
         withCredentials([
@@ -75,7 +84,10 @@ pipeline {
 
     stage('Commit & Push Version') {
       when {
-        branch 'main'
+        expression {
+          def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+          return branchName == 'main' || branchName == 'origin/main'
+        }
       }
       steps {
         dir(env.APP_DIR) {
@@ -100,7 +112,10 @@ pipeline {
 
     stage('Deploy to EC2') {
       when {
-        branch 'main'
+        expression {
+          def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+          return branchName == 'main' || branchName == 'origin/main'
+        }
       }
       steps {
         sshagent(['ec2-ssh']) {
