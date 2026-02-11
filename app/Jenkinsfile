@@ -82,34 +82,6 @@ pipeline {
       }
     }
 
-    stage('Commit & Push Version') {
-      when {
-        expression {
-          def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
-          return branchName == 'main' || branchName == 'origin/main'
-        }
-      }
-      steps {
-        dir(env.APP_DIR) {
-          sh 'git checkout -B main'
-          sh 'git add package.json package-lock.json'
-          sh "git -c user.name=jenkins -c user.email=jenkins@local commit -m \"chore: bump version to ${env.APP_VERSION}\""
-        }
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'git-https-creds',
-            usernameVariable: 'GIT_USER',
-            passwordVariable: 'GIT_PASS'
-          )
-        ]) {
-          sh """
-            git remote set-url origin https://$GIT_USER:$GIT_PASS@github.com/ABGer2025/TechWorldExercise9.git
-            git push origin main
-          """
-        }
-      }
-    }
-
     stage('Deploy to EC2') {
       when {
         expression {
