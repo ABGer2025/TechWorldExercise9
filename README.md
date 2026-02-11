@@ -24,4 +24,4 @@ DevOps Bootcamp exercises for AWS services, CI/CD, and deployment.
 
 - Deploys run only on the `main` branch; other branches run tests only.
 - EC2 host and deploy path are configured in the Jenkinsfile.
-- Test branch change to trigger the multibranch pipeline.
+- Multibranch pipeline job: `node-app-mb` (main deploys, test runs tests only).
